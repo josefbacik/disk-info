@@ -2,6 +2,7 @@
 
 import os
 import re
+import sys
 from subprocess import Popen,PIPE
 
 def find_device(data, pciid):
@@ -161,14 +162,31 @@ pcidata = p.stdout.read()
 
 devices = []
 
-for block in os.listdir("/sys/block"):
-    path = os.readlink(os.path.join("/sys/block/", block))
-    if re.search("virtual", path):
-        continue
+if len(sys.argv) > 1:
+    m = re.match("/dev/(\D+)\d*", sys.argv[1])
+    if m:
+        block = m.group(1)
+    else:
+        block = sys.argv[1]
+
+    try:
+        path = os.readlink(os.path.join("/sys/block/", block))
+    except Error:
+        print "Invalid device name " + block
+        sys.exit()
     d = Device()
     d.sysdir = os.path.join("/sys/block", path)
     d.populate_all(pcidata)
-    devices.append(d)    
+    devices.append(d)
+else:
+    for block in os.listdir("/sys/block"):
+        path = os.readlink(os.path.join("/sys/block/", block))
+        if re.search("virtual", path):
+            continue
+        d = Device()
+        d.sysdir = os.path.join("/sys/block", path)
+        d.populate_all(pcidata)
+        devices.append(d)    
 
 for d in devices:
     print d.diskname
