@@ -42,6 +42,7 @@ class Device:
         self.partitions = []
         self.removable = ""
         self.start = ""
+        self.discard = ""
 
     def populate_model(self):
         try:
@@ -115,6 +116,18 @@ class Device:
             else:
                 self.holders.append(dir)
 
+    def populate_discard(self):
+        try:
+            f = open(self.sysdir + "/queue/discard_granularity")
+            discard = f.read().rstrip()
+            f.close()
+            if discard == "0":
+                self.discard = "No"
+            else:
+                self.discard = "Yes"
+        except IOError:
+            self.discard = "No"
+
     def populate_start(self):
         try:
             f = open(self.sysdir + "/start")
@@ -162,6 +175,7 @@ class Device:
         self.populate_sectors()
         self.populate_sector_size()
         self.populate_rotational()
+        self.populate_discard()
         self.populate_host(pcidata)
 
 p = Popen(["lspci"], stdout=PIPE)
@@ -211,6 +225,7 @@ for d in devices:
     print "\tSize: " + pretty
     print "\tRemovable: " + d.removable
     print "\tDisk type: " + d.rotational
+    print "\tSupports discard: " + d.discard
     if len(d.holders) > 0:
         print "\tHolders:"
         for h in d.holders:
