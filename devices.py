@@ -9,6 +9,24 @@ def find_device(data, pciid):
     m = re.search("^" + id + "\s(.*)$", data, re.MULTILINE)
     return m.group(1)
 
+def pretty_size(size):
+    size_strs = ['B', 'KiB', 'MiB', 'GiB', 'TiB']
+    last_size = size
+    fract_size = size
+    num_divs = 0
+
+    while size > 1:
+        fract_size = last_size
+        last_size = size
+        size /= 1024
+        num_divs += 1
+
+    num_divs -= 1
+    fraction = fract_size / 1024
+    pretty = "%.2f" % fraction
+    pretty = pretty + size_strs[num_divs]
+    return pretty
+
 class Device:
     def __init__(self):
         self.sectorsize = ""
@@ -154,10 +172,13 @@ for block in os.listdir("/sys/block"):
 
 for d in devices:
     print d.diskname
-    print "\tHost:" + d.host
+    print "\tHost: " + d.host
     print "\tModel: " + d.model
-    print "\tSector size: " + d.sectorsize
+    print "\tSector size (bytes): " + d.sectorsize
     print "\tSectors: " + d.sectors
+    size = float(d.sectors) * float(d.sectorsize)
+    pretty = pretty_size(size)
+    print "\tSize: " + pretty
     print "\tRemovable: " + d.removable
     print "\tDisk type: " + d.rotational
     if len(d.holders) > 0:
@@ -168,8 +189,11 @@ for d in devices:
         print "\tPartitions:"
         for p in d.partitions:
             print "\t\t" + p.diskname
-            print "\t\t\tStart: " + p.start
+            print "\t\t\tStart sector: " + p.start
             print "\t\t\tSectors: " + p.sectors
+            size = float(p.sectors) * float(d.sectorsize)
+            pretty = pretty_size(size)
+            print "\t\t\tSize: " + pretty
             if len(p.holders) > 0:
                 print "\t\t\tHolders:"
                 for h in p.holders:
