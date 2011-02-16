@@ -36,6 +36,7 @@ class Device:
         self.sysdir = ""
         self.host = ""
         self.model = ""
+        self.vendor = ""
         self.holders = []
         self.diskname = ""
         self.partitions = []
@@ -49,6 +50,15 @@ class Device:
             f.close()
         except IOError:
             # do nothing
+            pass
+
+    def populate_vendor(self):
+        try:
+            f = open(self.sysdir + "/device/vendor")
+            self.vendor = f.read().rstrip()
+            f.close()
+        except IOError:
+            #do nothing
             pass
 
     def populate_sectors(self):
@@ -148,6 +158,7 @@ class Device:
         self.populate_partitions()
         self.populate_removable()
         self.populate_model()
+        self.populate_vendor()
         self.populate_sectors()
         self.populate_sector_size()
         self.populate_rotational()
@@ -191,6 +202,7 @@ else:
 for d in devices:
     print d.diskname
     print "\tHost: " + d.host
+    print "\tVendor: " + d.vendor
     print "\tModel: " + d.model
     print "\tSector size (bytes): " + d.sectorsize
     print "\tSectors: " + d.sectors
