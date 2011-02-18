@@ -3,6 +3,7 @@
 import os
 import re
 import sys
+import errno
 from subprocess import Popen,PIPE
 
 def find_device(data, pciid):
@@ -28,6 +29,12 @@ def pretty_size(size):
     pretty = pretty + size_strs[num_divs]
     return pretty
 
+def virtual_device(path):
+    for dir in os.listdir(path):
+        if re.search("device", dir):
+            return 0
+    return 1
+
 class Device:
     def __init__(self):
         self.sectorsize = ""
@@ -43,6 +50,7 @@ class Device:
         self.removable = ""
         self.start = ""
         self.discard = ""
+        self.sysfs_no_links = 0
 
     def populate_model(self):
         try:
@@ -76,7 +84,8 @@ class Device:
             self.sectorsize = f.read().rstrip()
             f.close()
         except IOError:
-            self.sectorsize = ""
+            # if this sysfs doesnt show us sectorsize then just assume 512
+            self.sectorsize = "512"
 
     def populate_rotational(self):
         try:
@@ -92,7 +101,14 @@ class Device:
             self.rotational = "SSD"
 
     def populate_host(self, pcidata):
-        m = re.match(".+/\d+:(\w+:\w+\.\w)/host\d+/\s*", self.sysdir)
+        if self.sysfs_no_links == 1:
+            try:
+                sysdir = os.readlink(os.path.join(self.sysdir, "device"))
+            except:
+                pass
+        else:
+            sysdir = self.sysdir
+        m = re.match(".+/\d+:(\w+:\w+\.\w)/host\d+/\s*", sysdir)
         if m:
             pciid = m.group(1)
             self.host = find_device(pcidata, pciid)
@@ -185,6 +201,7 @@ if err:
     sys.exit()
 pcidata = p.stdout.read()
 
+sysfs_no_links = 0
 devices = []
 
 if len(sys.argv) > 1:
@@ -196,20 +213,38 @@ if len(sys.argv) > 1:
 
     try:
         path = os.readlink(os.path.join("/sys/block/", block))
-    except Error:
-        print "Invalid device name " + block
-        sys.exit()
+    except OSError, e:
+        if e.errno == errno.EINVAL:
+            path = block
+        else:
+            print "Invalid device name " + block
+            sys.exit()
     d = Device()
     d.sysdir = os.path.join("/sys/block", path)
     d.populate_all(pcidata)
     devices.append(d)
 else:
     for block in os.listdir("/sys/block"):
-        path = os.readlink(os.path.join("/sys/block/", block))
+        try:
+            if sysfs_no_links == 0:
+                path = os.readlink(os.path.join("/sys/block/", block))
+            else:
+                path = block
+        except OSError, e:
+            if e.errno == errno.EINVAL:
+                path = block
+                sysfs_no_links = 1
+            else:
+                continue
         if re.search("virtual", path):
             continue
+        if sysfs_no_links == 1:
+            sysdir = os.path.join("/sys/block", path)
+            if virtual_device(sysdir) == 1:
+                continue
         d = Device()
         d.sysdir = os.path.join("/sys/block", path)
+        d.sysfs_no_links = sysfs_no_links
         d.populate_all(pcidata)
         devices.append(d)    
 
